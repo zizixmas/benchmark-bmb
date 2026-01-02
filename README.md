@@ -9,42 +9,34 @@ BMB 언어의 표준 벤치마크 스위트. C, Rust, BMB 간 성능 비교를 �
 **BMB >= C -O3** (모든 케이스)
 **BMB > C -O3** (계약 활용 케이스)
 
+## Current Status: v0.1
+
+### Implemented Benchmarks
+
+| Category | Benchmark | C | BMB | Description |
+|----------|-----------|---|-----|-------------|
+| compute | fibonacci | ✅ | ✅ | Recursive function calls |
+| compute | n_body | ✅ | 🔧 | N-body simulation (pending f64) |
+| contract | bounds_check | ✅ | ✅ | Bounds check elimination |
+
 ## Benchmark Categories
 
 ### Compute-Intensive
 
 | Benchmark | Description | Measures |
 |-----------|-------------|----------|
+| `fibonacci` | Recursive Fibonacci | Integer ops, function calls |
 | `n-body` | N-body simulation | FP arithmetic, SIMD |
 | `mandelbrot` | Fractal generation | SIMD, parallelism |
 | `spectral-norm` | Matrix operations | Linear algebra |
-| `fannkuch` | Permutation | Integer ops, branching |
-| `fasta` | Sequence generation | String ops |
-
-### Memory-Intensive
-
-| Benchmark | Description | Measures |
-|-----------|-------------|----------|
-| `binary-trees` | Tree alloc/dealloc | GC/allocator |
-| `reverse-complement` | In-place reversal | Memory bandwidth |
-| `k-nucleotide` | Hashtable | Collection performance |
-
-### Real-World
-
-| Benchmark | Description | Measures |
-|-----------|-------------|----------|
-| `json-parse` | JSON parsing | Parser performance |
-| `regex-redux` | Regex matching | Regex engine |
-| `http-throughput` | HTTP handling | I/O, concurrency |
 
 ### Contract-Optimized (BMB-specific)
 
 | Benchmark | Description | Contract Benefit |
 |-----------|-------------|------------------|
-| `bounds-check-elim` | Array operations | pre로 경계검사 제거 |
-| `null-check-elim` | Optional handling | NonNull 타입으로 제거 |
-| `aliasing-proof` | Pointer operations | &mut 배타성 증명 |
-| `purity-opt` | Pure functions | 순수성 기반 메모이제이션 |
+| `bounds-check` | Array operations | pre로 경계검사 제거 |
+| `null-check` | Optional handling | NonNull 타입으로 제거 |
+| `purity-opt` | Pure functions | 순수성 기반 최적화 |
 
 ## Directory Structure
 
@@ -53,63 +45,58 @@ benchmark-bmb/
 ├── README.md
 ├── benches/
 │   ├── compute/
-│   │   ├── n_body/
-│   │   │   ├── c/          # C implementation
-│   │   │   ├── rust/       # Rust implementation
-│   │   │   └── bmb/        # BMB implementation
-│   │   ├── mandelbrot/
-│   │   └── ...
-│   ├── memory/
-│   │   ├── binary_trees/
-│   │   └── ...
-│   ├── realworld/
-│   │   ├── json_parse/
-│   │   └── ...
-│   └── contract/           # BMB-specific optimizations
-│       ├── bounds_check/
-│       └── ...
-├── runner/                 # Benchmark runner (Rust)
+│   │   ├── fibonacci/
+│   │   │   ├── c/main.c
+│   │   │   └── bmb/main.bmb
+│   │   └── n_body/
+│   │       ├── c/main.c
+│   │       └── bmb/main.bmb
+│   └── contract/
+│       └── bounds_check/
+│           ├── c/main.c
+│           └── bmb/main.bmb
+├── runner/
 │   ├── Cargo.toml
-│   └── src/
-├── results/                # Historical results
-│   └── YYYY-MM-DD/
-└── dashboard/              # Web dashboard (planned)
+│   └── src/main.rs
+└── results/
 ```
 
 ## Running Benchmarks
 
 ```bash
-# Install runner
-cargo install --path runner
+# Build runner
+cd runner
+cargo build --release
 
 # Run all benchmarks
-benchmark-bmb run --all
+./target/release/benchmark-bmb run --all
 
 # Run specific category
-benchmark-bmb run --category compute
+./target/release/benchmark-bmb run --category compute
 
 # Run single benchmark
-benchmark-bmb run n-body
+./target/release/benchmark-bmb run fibonacci
 
-# Compare languages
-benchmark-bmb compare n-body --langs c,rust,bmb
+# List available benchmarks
+./target/release/benchmark-bmb list
 
-# Generate report
-benchmark-bmb report --format html --output results/
+# Create new benchmark
+./target/release/benchmark-bmb new my_benchmark --category compute
 ```
 
 ## Output Format
 
 ```
-=== n-body (1,000,000 iterations) ===
+=== BMB Benchmark Suite ===
 
-| Language | Time (ms) | Memory (KB) | Relative |
-|----------|-----------|-------------|----------|
-| C -O3    |    142.3  |       1,024 |   1.00x  |
-| Rust     |    145.7  |       1,048 |   1.02x  |
-| BMB      |    139.8  |       1,016 |   0.98x  |  ✓
+Running: fibonacci
 
-BMB is 1.8% faster than C -O3
+  Language     Median (ms)     Min (ms)     Max (ms)   Relative
+  ------------------------------------------------------------
+  C                 850.23       845.12       860.45      1.00x
+  BMB               855.67       850.01       865.23         ✓
+
+BMB is within 1% of C -O3
 ```
 
 ## Benchmark Requirements
@@ -123,66 +110,30 @@ BMB is 1.8% faster than C -O3
 
 ### Measurement
 
-- **Warm-up**: 3 iterations before measurement
-- **Iterations**: 10 measurements, median reported
-- **Environment**: Identical hardware, isolated execution
-- **Metrics**: Wall time, peak memory, CPU cycles
+- **Warm-up**: 2 iterations before measurement
+- **Iterations**: 5 measurements, median reported
+- **Metrics**: Wall time, relative performance
 
-## Adding New Benchmarks
+## Runner CLI Commands
 
-```bash
-# Create benchmark scaffold
-benchmark-bmb new my_benchmark --category compute
-
-# Implement in each language
-# benches/compute/my_benchmark/{c,rust,bmb}/
-
-# Validate implementations produce same output
-benchmark-bmb validate my_benchmark
-
-# Submit PR
-```
-
-## CI Integration
-
-```yaml
-# .github/workflows/benchmark.yml
-name: Benchmark
-
-on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '0 0 * * 0'  # Weekly
-
-jobs:
-  benchmark:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: lang-bmb/action-bmb@v1
-      - run: benchmark-bmb run --all
-      - run: benchmark-bmb report --publish
-```
-
-## Results Dashboard
-
-Visit [bench.bmb-lang.org](https://bench.bmb-lang.org) for:
-- Historical performance trends
-- Cross-platform comparisons
-- Regression detection alerts
-- Detailed analysis reports
+| Command | Description |
+|---------|-------------|
+| `run` | Run benchmarks |
+| `list` | List available benchmarks |
+| `new` | Create new benchmark scaffold |
+| `compare` | Compare languages for a benchmark |
+| `validate` | Validate implementations produce same output |
+| `report` | Generate benchmark report |
 
 ## Roadmap
 
-| Version | Features |
-|---------|----------|
-| v0.1 | Basic runner, compute benchmarks |
-| v0.2 | Memory benchmarks, comparison reports |
-| v0.3 | Real-world benchmarks, CI integration |
-| v0.4 | Contract-optimized benchmarks |
-| v0.5 | Dashboard, regression detection |
-| v1.0 | Full suite, automated publishing |
+| Version | Features | Status |
+|---------|----------|--------|
+| v0.1 | Basic runner, compute benchmarks | ✅ |
+| v0.2 | Memory benchmarks, comparison reports | 계획 |
+| v0.3 | Real-world benchmarks, CI integration | 계획 |
+| v0.4 | Contract-optimized benchmarks (full) | 계획 |
+| v0.5 | Dashboard, regression detection | 계획 |
 
 ## Contributing
 

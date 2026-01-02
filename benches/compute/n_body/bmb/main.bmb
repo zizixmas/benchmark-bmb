@@ -1,0 +1,22 @@
+// N-Body simulation - compute intensive benchmark
+// Measures: FP arithmetic, struct operations
+// Note: Simplified version - full implementation pending f64 support
+
+// Constants
+// PI = 3.141592653589793
+// SOLAR_MASS = 4 * PI * PI
+// DAYS_PER_YEAR = 365.24
+
+// Body state
+// struct Body {
+//     x: f64, y: f64, z: f64,
+//     vx: f64, vy: f64, vz: f64,
+//     mass: f64
+// }
+
+// Placeholder: Full implementation requires f64 and sqrt
+fn main() -> i64 = {
+    // N-body simulation would go here
+    // Currently a placeholder for benchmark structure
+    0
+};
