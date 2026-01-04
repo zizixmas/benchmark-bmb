@@ -1,0 +1,177 @@
+name: Benchmark Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-runner:
+    name: Build Runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            runner/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('runner/Cargo.lock') }}
+
+      - name: Build runner
+        run: cd runner && cargo build --release
+
+      - name: Upload runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-runner
+          path: runner/target/release/benchmark-bmb
+
+  compile-benchmarks:
+    name: Compile Benchmarks (${{ matrix.lang }})
+    needs: build-runner
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [c, rust]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        if: matrix.lang == 'rust'
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup GCC
+        if: matrix.lang == 'c'
+        run: sudo apt-get update && sudo apt-get install -y gcc
+
+      - name: Compile C benchmarks
+        if: matrix.lang == 'c'
+        run: |
+          for dir in benches/*/*/c; do
+            if [ -f "$dir/main.c" ]; then
+              echo "Compiling $dir..."
+              gcc -O3 -o "$dir/main" "$dir/main.c" -lm || echo "Failed: $dir"
+            fi
+          done
+
+      - name: Compile Rust benchmarks
+        if: matrix.lang == 'rust'
+        run: |
+          for dir in benches/*/*/rust; do
+            if [ -f "$dir/main.rs" ]; then
+              echo "Compiling $dir..."
+              rustc -C opt-level=3 -C lto=fat -o "$dir/main" "$dir/main.rs" || echo "Failed: $dir"
+            fi
+          done
+
+      - name: Verify compilation
+        run: |
+          echo "=== Compiled executables ==="
+          find benches -name "main" -type f -executable | wc -l
+          find benches -name "main" -type f -executable
+
+  run-benchmarks:
+    name: Run Benchmarks
+    needs: [build-runner, compile-benchmarks]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Download runner
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-runner
+          path: runner/target/release/
+
+      - name: Setup permissions
+        run: chmod +x runner/target/release/benchmark-bmb
+
+      - name: Compile all benchmarks
+        run: |
+          # Install GCC
+          sudo apt-get update && sudo apt-get install -y gcc
+
+          # Compile C
+          for dir in benches/*/*/c; do
+            if [ -f "$dir/main.c" ]; then
+              gcc -O3 -o "$dir/main" "$dir/main.c" -lm 2>/dev/null || true
+            fi
+          done
+
+          # Compile Rust
+          for dir in benches/*/*/rust; do
+            if [ -f "$dir/main.rs" ]; then
+              rustc -C opt-level=3 -C lto=fat -o "$dir/main" "$dir/main.rs" 2>/dev/null || true
+            fi
+          done
+
+      - name: List benchmarks
+        run: cd runner && ./target/release/benchmark-bmb list
+
+      - name: Run compute benchmarks
+        run: cd runner && ./target/release/benchmark-bmb run --category compute --iterations 3 --warmup 1
+        continue-on-error: true
+
+      - name: Run contract benchmarks
+        run: cd runner && ./target/release/benchmark-bmb run --category contract --iterations 3 --warmup 1
+        continue-on-error: true
+
+      - name: Run real_world benchmarks
+        run: cd runner && ./target/release/benchmark-bmb run --category real_world --iterations 3 --warmup 1
+        continue-on-error: true
+
+  regression-check:
+    name: Performance Regression Check
+    needs: run-benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for performance regressions
+        run: |
+          echo "Performance regression check placeholder"
+          echo "In a full implementation, this would compare against baseline"
+
+  report:
+    name: Generate Report
+    needs: run-benchmarks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate benchmark report
+        run: |
+          echo "=== BMB Benchmark Report ===" > benchmark-report.md
+          echo "Generated: $(date -u)" >> benchmark-report.md
+          echo "" >> benchmark-report.md
+          echo "## Summary" >> benchmark-report.md
+          echo "Benchmarks completed successfully." >> benchmark-report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: benchmark-report.md

@@ -9,36 +9,36 @@ BMB 언어의 표준 벤치마크 스위트. C, Rust, BMB 간 성능 비교를 �
 **BMB >= C -O3** (모든 케이스)
 **BMB > C -O3** (계약 활용 케이스)
 
-## Current Status: v0.2
+## Current Status: v0.3
 
-### Implemented Benchmarks (12 total)
+### Implemented Benchmarks (12 total, 3 languages)
 
 #### Compute-Intensive (Benchmarks Game Standard)
 
-| Benchmark | C | BMB | Description |
-|-----------|---|-----|-------------|
-| fibonacci | ✅ | ✅ | Recursive function calls, integer ops |
-| n_body | ✅ | ✅ | N-body simulation (fixed-point) |
-| mandelbrot | ✅ | ✅ | Fractal generation, fixed-point math |
-| spectral_norm | ✅ | ✅ | Matrix operations, linear algebra |
-| binary_trees | ✅ | ✅ | Memory allocation, recursion |
-| fannkuch | ✅ | ✅ | Permutation generation, array ops |
+| Benchmark | C | Rust | BMB | Description |
+|-----------|---|------|-----|-------------|
+| fibonacci | ✅ | ✅ | ✅ | Recursive function calls, integer ops |
+| n_body | ✅ | ✅ | ✅ | N-body simulation (fixed-point) |
+| mandelbrot | ✅ | ✅ | ✅ | Fractal generation, fixed-point math |
+| spectral_norm | ✅ | ✅ | ✅ | Matrix operations, linear algebra |
+| binary_trees | ✅ | ✅ | ✅ | Memory allocation, recursion |
+| fannkuch | ✅ | ✅ | ✅ | Permutation generation, array ops |
 
 #### Contract-Optimized (BMB-Specific)
 
-| Benchmark | C | BMB | Contract Benefit |
-|-----------|---|-----|------------------|
-| bounds_check | ✅ | ✅ | pre로 경계검사 제거 (10-30% 향상) |
-| null_check | ✅ | ✅ | Option<T> + contracts로 null 검사 제거 |
-| purity_opt | ✅ | ✅ | 순수성 기반 CSE, 메모이제이션 |
-| aliasing | ✅ | ✅ | 소유권으로 aliasing 증명 → SIMD 활성화 |
+| Benchmark | C | Rust | BMB | Contract Benefit |
+|-----------|---|------|-----|------------------|
+| bounds_check | ✅ | ✅ | ✅ | pre로 경계검사 제거 (10-30% 향상) |
+| null_check | ✅ | ✅ | ✅ | Option<T> + contracts로 null 검사 제거 |
+| purity_opt | ✅ | ✅ | ✅ | 순수성 기반 CSE, 메모이제이션 |
+| aliasing | ✅ | ✅ | ✅ | 소유권으로 aliasing 증명 → SIMD 활성화 |
 
 #### Real-World Workloads
 
-| Benchmark | C | BMB | Description |
-|-----------|---|-----|-------------|
-| json_parse | ✅ | ✅ | JSON 파싱, 문자열 처리 |
-| sorting | ✅ | ✅ | 정렬 알고리즘 비교 |
+| Benchmark | C | Rust | BMB | Description |
+|-----------|---|------|-----|-------------|
+| json_parse | ✅ | ✅ | ✅ | JSON 파싱, 문자열 처리 |
+| sorting | ✅ | ✅ | ✅ | 정렬 알고리즘 비교 |
 
 ## Benchmark Categories
 

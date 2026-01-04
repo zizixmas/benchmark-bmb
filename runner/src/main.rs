@@ -215,6 +215,7 @@ fn run_language_benchmark(
 ) -> Option<Vec<f64>> {
     let executable = match lang {
         "c" => compile_c(dir)?,
+        "rust" => compile_rust(dir)?,
         "bmb" => compile_bmb(dir)?,
         _ => return None,
     };
@@ -250,9 +251,40 @@ fn compile_c(dir: &Path) -> Option<PathBuf> {
         return None;
     }
 
-    let output = dir.join("main");
+    let output = if cfg!(windows) {
+        dir.join("main.exe")
+    } else {
+        dir.join("main")
+    };
+
     let status = Command::new("gcc")
         .args(["-O3", "-o"])
+        .arg(&output)
+        .arg(&source)
+        .status()
+        .ok()?;
+
+    if status.success() {
+        Some(output)
+    } else {
+        None
+    }
+}
+
+fn compile_rust(dir: &Path) -> Option<PathBuf> {
+    let source = dir.join("main.rs");
+    if !source.exists() {
+        return None;
+    }
+
+    let output = if cfg!(windows) {
+        dir.join("main.exe")
+    } else {
+        dir.join("main")
+    };
+
+    let status = Command::new("rustc")
+        .args(["-C", "opt-level=3", "-C", "lto=fat", "-C", "target-cpu=native", "-o"])
         .arg(&output)
         .arg(&source)
         .status()
@@ -358,8 +390,8 @@ fn create_benchmark(name: &str, category: &str) {
     let benches_dir = find_benches_dir();
     let bench_path = benches_dir.join(category).join(name);
 
-    // Create directories
-    for lang in ["c", "bmb"] {
+    // Create directories for all languages
+    for lang in ["c", "rust", "bmb"] {
         let lang_dir = bench_path.join(lang);
         fs::create_dir_all(&lang_dir).unwrap();
 
@@ -374,6 +406,15 @@ int main() {
 }
 "#;
                 fs::write(lang_dir.join("main.c"), template).unwrap();
+            }
+            "rust" => {
+                let template = r#"// TODO: Implement benchmark
+fn main() {
+    let result = 42;
+    println!("{}", result);
+}
+"#;
+                fs::write(lang_dir.join("main.rs"), template).unwrap();
             }
             "bmb" => {
                 let template = r#"// TODO: Implement benchmark
