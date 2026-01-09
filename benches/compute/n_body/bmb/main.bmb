@@ -1,22 +1,111 @@
--- N-Body simulation - compute intensive benchmark
--- Measures: FP arithmetic, struct operations
--- Note: Simplified version - full implementation pending f64 support
+-- N-Body simulation benchmark (2-body simplified)
+-- v0.34: Uses f64, sqrt, i64_to_f64 intrinsics
+-- Measures: f64 arithmetic, sqrt computation
 
 -- Constants
--- PI = 3.141592653589793
--- SOLAR_MASS = 4 * PI * PI
--- DAYS_PER_YEAR = 365.24
+fn PI() -> f64 = 3.141592653589793;
+fn SOLAR_MASS() -> f64 = 4.0 * PI() * PI();
+fn DAYS_PER_YEAR() -> f64 = 365.24;
 
--- Body state
--- struct Body {
---     x: f64, y: f64, z: f64,
---     vx: f64, vy: f64, vz: f64,
---     mass: f64
--- }
+-- 2-body simulation state: Sun and Jupiter
+-- Position: x1,y1,z1 (Sun), x2,y2,z2 (Jupiter)
+-- Velocity: vx1,vy1,vz1 (Sun), vx2,vy2,vz2 (Jupiter)
+-- Mass: m1 (Sun), m2 (Jupiter)
 
--- Placeholder: Full implementation requires f64 and sqrt
+-- Compute distance between two bodies
+fn distance(x1: f64, y1: f64, z1: f64, x2: f64, y2: f64, z2: f64) -> f64 =
+    let dx = x1 - x2;
+    let dy = y1 - y2;
+    let dz = z1 - z2;
+    sqrt(dx * dx + dy * dy + dz * dz);
+
+-- Energy of 2-body system
+fn energy_2body(
+    x1: f64, y1: f64, z1: f64, vx1: f64, vy1: f64, vz1: f64, m1: f64,
+    x2: f64, y2: f64, z2: f64, vx2: f64, vy2: f64, vz2: f64, m2: f64
+) -> f64 =
+    let ke1 = 0.5 * m1 * (vx1 * vx1 + vy1 * vy1 + vz1 * vz1);
+    let ke2 = 0.5 * m2 * (vx2 * vx2 + vy2 * vy2 + vz2 * vz2);
+    let dist = distance(x1, y1, z1, x2, y2, z2);
+    let pe = 0.0 - (m1 * m2 / dist);
+    ke1 + ke2 + pe;
+
+-- Simulation step for 2-body problem
+-- Returns energy after n steps
+fn simulate_rec(
+    x1: f64, y1: f64, z1: f64, vx1: f64, vy1: f64, vz1: f64, m1: f64,
+    x2: f64, y2: f64, z2: f64, vx2: f64, vy2: f64, vz2: f64, m2: f64,
+    dt: f64, step: i64, n: i64
+) -> f64 =
+    if step >= n then
+        energy_2body(x1, y1, z1, vx1, vy1, vz1, m1, x2, y2, z2, vx2, vy2, vz2, m2)
+    else
+        -- Compute force direction and magnitude
+        let dx = x1 - x2;
+        let dy = y1 - y2;
+        let dz = z1 - z2;
+        let d2 = dx * dx + dy * dy + dz * dz;
+        let d = sqrt(d2);
+        let mag = dt / (d2 * d);
+
+        -- Update velocities
+        let new_vx1 = vx1 - dx * m2 * mag;
+        let new_vy1 = vy1 - dy * m2 * mag;
+        let new_vz1 = vz1 - dz * m2 * mag;
+        let new_vx2 = vx2 + dx * m1 * mag;
+        let new_vy2 = vy2 + dy * m1 * mag;
+        let new_vz2 = vz2 + dz * m1 * mag;
+
+        -- Update positions
+        let new_x1 = x1 + dt * new_vx1;
+        let new_y1 = y1 + dt * new_vy1;
+        let new_z1 = z1 + dt * new_vz1;
+        let new_x2 = x2 + dt * new_vx2;
+        let new_y2 = y2 + dt * new_vy2;
+        let new_z2 = z2 + dt * new_vz2;
+
+        simulate_rec(
+            new_x1, new_y1, new_z1, new_vx1, new_vy1, new_vz1, m1,
+            new_x2, new_y2, new_z2, new_vx2, new_vy2, new_vz2, m2,
+            dt, step + 1, n
+        );
+
 fn main() -> i64 = {
-    // N-body simulation would go here
-    // Currently a placeholder for benchmark structure
+    -- Sun initial state (at origin, stationary)
+    let x1 = 0.0;
+    let y1 = 0.0;
+    let z1 = 0.0;
+    let vx1 = 0.0;
+    let vy1 = 0.0;
+    let vz1 = 0.0;
+    let m1 = SOLAR_MASS();
+
+    -- Jupiter initial state
+    let x2 = 4.84143144246472090e0;
+    let y2 = 0.0 - 1.16032004402742839e0;
+    let z2 = 0.0 - 1.03622044471123109e-1;
+    let vx2 = 1.66007664274403694e-3 * DAYS_PER_YEAR();
+    let vy2 = 7.69901118419740425e-3 * DAYS_PER_YEAR();
+    let vz2 = 0.0 - 6.90460016972063023e-5 * DAYS_PER_YEAR();
+    let m2 = 9.54791938424326609e-4 * SOLAR_MASS();
+
+    -- Offset momentum (sun compensates for Jupiter)
+    let px = vx2 * m2;
+    let py = vy2 * m2;
+    let pz = vz2 * m2;
+    let vx1_adj = 0.0 - px / SOLAR_MASS();
+    let vy1_adj = 0.0 - py / SOLAR_MASS();
+    let vz1_adj = 0.0 - pz / SOLAR_MASS();
+
+    -- Run simulation for 1000 steps
+    let final_energy = simulate_rec(
+        x1, y1, z1, vx1_adj, vy1_adj, vz1_adj, m1,
+        x2, y2, z2, vx2, vy2, vz2, m2,
+        0.01, 0, 1000
+    );
+
+    -- Output energy scaled to integer for comparison
+    let energy_scaled = f64_to_i64(final_energy * 1e9);
+    println(energy_scaled);
     0
 };

@@ -1,0 +1,44 @@
+-- Mandelbrot set benchmark (floating-point version)
+-- v0.34: Uses f64 and i64_to_f64 intrinsics
+-- Measures: f64 arithmetic, iteration
+
+-- Mandelbrot iteration with f64
+fn iterate_fp(x: f64, y: f64, x0: f64, y0: f64, iter: i64, max_iter: i64) -> i64 =
+    if iter >= max_iter then max_iter
+    else if x * x + y * y > 4.0 then iter
+    else let xtemp = x * x - y * y + x0;
+         let ytemp = 2.0 * x * y + y0;
+         iterate_fp(xtemp, ytemp, x0, y0, iter + 1, max_iter);
+
+-- Convert pixel to complex coordinate
+fn pixel_to_x(px: i64, size: i64) -> f64 =
+    i64_to_f64(px) * 4.0 / i64_to_f64(size) - 2.0;
+
+fn pixel_to_y(py: i64, size: i64) -> f64 =
+    i64_to_f64(py) * 4.0 / i64_to_f64(size) - 2.0;
+
+-- Check single point
+fn mandelbrot_point_fp(px: i64, py: i64, size: i64, max_iter: i64) -> i64 =
+    let x0 = pixel_to_x(px, size);
+    let y0 = pixel_to_y(py, size);
+    iterate_fp(0.0, 0.0, x0, y0, 0, max_iter);
+
+-- Count points in set (row-by-row)
+fn count_row(px: i64, py: i64, size: i64, max_iter: i64, acc: i64) -> i64 =
+    if px >= size then acc
+    else let result = mandelbrot_point_fp(px, py, size, max_iter);
+         let delta = if result == max_iter then 1 else 0;
+         count_row(px + 1, py, size, max_iter, acc + delta);
+
+fn count_all(py: i64, size: i64, max_iter: i64, acc: i64) -> i64 =
+    if py >= size then acc
+    else let row_count = count_row(0, py, size, max_iter, 0);
+         count_all(py + 1, size, max_iter, acc + row_count);
+
+fn main() -> i64 = {
+    let size = 200;
+    let max_iter = 50;
+    let result = count_all(0, size, max_iter, 0);
+    println(result);
+    0
+};
