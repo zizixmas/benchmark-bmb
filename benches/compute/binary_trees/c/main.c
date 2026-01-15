@@ -36,7 +36,7 @@ void free_tree(Node* node) {
 
 int main() {
     int min_depth = 4;
-    int max_depth = 16;
+    int max_depth = 14;  // Aligned with BMB version for fair comparison
     int stretch_depth = max_depth + 1;
 
     Node* stretch = make_tree(stretch_depth);

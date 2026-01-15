@@ -1,50 +1,130 @@
--- Fannkuch-redux benchmark
--- Measures: array manipulation, permutation generation
+// Fannkuch-redux benchmark
+// Measures: array manipulation, permutation generation
+// Algorithm: Standard Heap's algorithm permutation with pancake flipping
+// Aligned with C version (n=10) for fair comparison
 
--- Pancake flipping: reverse first k elements
-fn flip_count(perm_sum: i64, n: i64) -> i64 =
-    flip_iter(perm_sum, n, 0);
+// Array operations using malloc/load_i64/store_i64
+fn array_new(n: i64) -> i64 = malloc(n * 8);
 
-fn flip_iter(perm_sum: i64, n: i64, count: i64) -> i64 =
-    let first = (perm_sum / pow10(n - 1)) - (perm_sum / pow10(n)) * 10;
-    if first == 1 then count
-    else flip_iter(reverse_prefix(perm_sum, first, n), n, count + 1);
+fn array_get(arr: i64, i: i64) -> i64 = load_i64(arr + i * 8);
 
--- Power of 10
-fn pow10_iter(exp: i64, acc: i64) -> i64 =
-    if exp <= 0 then acc
-    else pow10_iter(exp - 1, acc * 10);
+fn array_set(arr: i64, i: i64, val: i64) -> () = store_i64(arr + i * 8, val);
 
-fn pow10(exp: i64) -> i64 = pow10_iter(exp, 1);
+fn array_free(arr: i64) -> () = free(arr);
 
--- Reverse first k digits of a number encoded permutation
-fn reverse_prefix(perm: i64, k: i64, n: i64) -> i64 =
-    let prefix = perm / pow10(n - k);
-    let suffix = perm - prefix * pow10(n - k);
-    let reversed = reverse_number(prefix, k);
-    reversed * pow10(n - k) + suffix;
+// Max helper
+fn max(a: i64, b: i64) -> i64 = if a > b { a } else { b };
 
-fn reverse_number(num: i64, digits: i64) -> i64 =
-    reverse_iter(num, digits, 0);
+// Initialize arrays
+fn init_perm1(perm1: i64, count: i64, n: i64, i: i64) -> () =
+    if i >= n { () } else { {
+        array_set(perm1, i, i);
+        array_set(count, i, i + 1);
+        init_perm1(perm1, count, n, i + 1)
+    } };
 
-fn reverse_iter(num: i64, remaining: i64, acc: i64) -> i64 =
-    if remaining <= 0 then acc
-    else let digit = num - (num / 10) * 10;
-         reverse_iter(num / 10, remaining - 1, acc * 10 + digit);
+// Copy perm1 to perm
+fn copy_perm(perm: i64, perm1: i64, n: i64, i: i64) -> () =
+    if i >= n { () } else { {
+        array_set(perm, i, array_get(perm1, i));
+        copy_perm(perm, perm1, n, i + 1)
+    } };
 
--- Generate next permutation (simplified Heap's algorithm concept)
-fn next_perm(perm: i64, n: i64, c_sum: i64) -> i64 =
-    perm + 1;  -- simplified: just increment
+// Swap elements in array
+fn swap_in_array(arr: i64, i: i64, j: i64) -> () = {
+    let tmp = array_get(arr, i);
+    array_set(arr, i, array_get(arr, j));
+    array_set(arr, j, tmp)
+};
 
--- Count max flips for all permutations up to limit
-fn max_flips_iter(perm: i64, n: i64, limit: i64, count: i64, max_so_far: i64) -> i64 =
-    if count >= limit then max_so_far
-    else let flips = flip_count(perm, n);
-         let new_max = if flips > max_so_far then flips else max_so_far;
-         max_flips_iter(next_perm(perm, n, 0), n, limit, count + 1, new_max);
+// Reverse first k elements
+fn reverse_prefix_iter(perm: i64, lo: i64, hi: i64) -> () =
+    if lo >= hi { () } else { {
+        swap_in_array(perm, lo, hi);
+        reverse_prefix_iter(perm, lo + 1, hi - 1)
+    } };
+
+fn reverse_prefix(perm: i64, first: i64) -> () =
+    reverse_prefix_iter(perm, 0, first);
+
+// Count flips for current permutation
+fn count_flips_iter(perm: i64, flips: i64) -> i64 =
+    let first = array_get(perm, 0);
+    if first == 0 { flips }
+    else { {
+        reverse_prefix(perm, first);
+        count_flips_iter(perm, flips + 1)
+    } };
+
+fn count_flips(perm: i64, perm1: i64, n: i64) -> i64 = {
+    copy_perm(perm, perm1, n, 0);
+    count_flips_iter(perm, 0)
+};
+
+// Generate next permutation (Heap's algorithm variant)
+fn next_perm_iter(perm1: i64, count: i64, n: i64, i: i64) -> i64 =
+    if i >= n { 0 }  // No more permutations
+    else { {
+        let tmp = array_get(perm1, i);
+        // Shift elements: perm1[i] = perm1[i-1], ..., perm1[1] = perm1[0], perm1[0] = tmp
+        shift_down(perm1, i);
+        array_set(perm1, 0, tmp);
+
+        let c = array_get(count, i) - 1;
+        array_set(count, i, c);
+
+        if c != 0 { 1 }  // Continue with this permutation
+        else { {
+            array_set(count, i, i + 1);
+            next_perm_iter(perm1, count, n, i + 1)
+        } }
+    } };
+
+// Shift elements: perm1[k] = perm1[k-1], ..., perm1[1] = perm1[0]
+fn shift_down(perm1: i64, k: i64) -> () =
+    shift_down_iter(perm1, k, k);
+
+fn shift_down_iter(perm1: i64, k: i64, j: i64) -> () =
+    if j <= 0 { () }
+    else { {
+        array_set(perm1, j, array_get(perm1, j - 1));
+        shift_down_iter(perm1, k, j - 1)
+    } };
+
+fn next_perm(perm1: i64, count: i64, n: i64) -> i64 =
+    next_perm_iter(perm1, count, n, 1);
+
+// Main benchmark loop
+fn fannkuch_iter(perm: i64, perm1: i64, count: i64, n: i64, maxFlips: i64, checksum: i64, permCount: i64) -> i64 = {
+    let flips = count_flips(perm, perm1, n);
+    let newMax = max(maxFlips, flips);
+    let delta = if (permCount - (permCount / 2) * 2) == 0 { flips } else { 0 - flips };
+    let newChecksum = checksum + delta;
+
+    let hasNext = next_perm(perm1, count, n);
+    if hasNext == 0 { {
+        println(newChecksum);
+        newMax
+    } }
+    else { fannkuch_iter(perm, perm1, count, n, newMax, newChecksum, permCount + 1) }
+};
+
+fn fannkuch(n: i64) -> i64 = {
+    let perm = array_new(n);
+    let perm1 = array_new(n);
+    let count = array_new(n);
+
+    init_perm1(perm1, count, n, 0);
+
+    let result = fannkuch_iter(perm, perm1, count, n, 0, 0, 0);
+
+    array_free(perm);
+    array_free(perm1);
+    array_free(count);
+
+    result
+};
 
 fn main() -> i64 =
-    let n = 6;
-    let initial_perm = 123456;  -- encoded as 1,2,3,4,5,6
-    let limit = 720;  -- 6!
-    max_flips_iter(initial_perm, n, limit, 0, 0);
+    let n = 10;
+    fannkuch(n);
